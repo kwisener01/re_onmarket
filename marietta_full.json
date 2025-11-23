@@ -1,0 +1,41 @@
+{
+  "success": true,
+  "property": {
+    "address": "2598 Hencley Cir SW, Marietta, GA 30008",
+    "beds": 0,
+    "baths": 0,
+    "sqft": 0,
+    "year_built": 2000,
+    "property_age": 25,
+    "list_price": 0
+  },
+  "valuation": {
+    "zestimate": 0,
+    "arv_conservative": 0.0,
+    "arv_source": "Zillow Zestimate \u00d7 0.95"
+  },
+  "rehab": {
+    "recommended": 0,
+    "scope": "Medium",
+    "description": "Kitchen, baths, HVAC, roof",
+    "per_sqft": 0
+  },
+  "investor_analysis": {
+    "mao_70_percent": 0.0,
+    "mao_65_percent": 0.0,
+    "mao_75_percent": 0.0,
+    "recommended_max_offer": 0.0,
+    "profit_potential": 0.0,
+    "roi_percentage": 0
+  },
+  "deal_quality": {
+    "score": 3,
+    "label": "\u274c POOR",
+    "recommendation": "PASS - No profit",
+    "reasons": [
+      "Overpriced (>75% of ARV)"
+    ],
+    "price_to_arv_ratio": 1.0
+  },
+  "analysis_date": "2025-11-22T19:26:52.910265"
+}

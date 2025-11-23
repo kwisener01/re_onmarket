@@ -31,8 +31,17 @@ class RedfinAPI:
             # First, search for the property to get the URL
             search_endpoint = f"/stingray/do/location-autocomplete?location={encoded_query}&v=2"
 
+            # Complete browser-like headers to avoid 403 errors
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.redfin.com/',
+                'Origin': 'https://www.redfin.com',
+                'Connection': 'keep-alive',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin'
             }
 
             conn.request("GET", search_endpoint, headers=headers)
@@ -40,7 +49,10 @@ class RedfinAPI:
             data = res.read()
 
             if res.status != 200:
-                print(f"⚠️  Redfin search error: {res.status}")
+                if res.status == 403:
+                    print(f"⚠️  Redfin blocked request (403). They may be rate-limiting or detecting automation. Using Realtor.com instead is recommended.")
+                else:
+                    print(f"⚠️  Redfin search error: {res.status}")
                 return None
 
             # Parse response (Redfin returns JSON with a prefix to strip)

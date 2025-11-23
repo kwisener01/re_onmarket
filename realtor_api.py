@@ -60,9 +60,46 @@ class RealtorAPI:
         finally:
             conn.close()
 
+    def get_property_detail(self, property_id: str) -> Optional[Dict]:
+        """
+        Get detailed property information from Realtor.com
+        Returns full property details including description
+        """
+        if not self.api_key:
+            print("⚠️  Realtor API key not configured")
+            return None
+
+        try:
+            conn = http.client.HTTPSConnection(self.api_host)
+
+            headers = {
+                'x-rapidapi-key': self.api_key,
+                'x-rapidapi-host': self.api_host
+            }
+
+            # Use detail endpoint
+            endpoint = f"/properties/detail?property_id={property_id}"
+
+            conn.request("GET", endpoint, headers=headers)
+            res = conn.getresponse()
+            data = res.read()
+
+            if res.status == 200:
+                return json.loads(data.decode("utf-8"))
+            else:
+                print(f"⚠️  Realtor detail API error: {res.status}")
+                return None
+
+        except Exception as e:
+            print(f"⚠️  Realtor detail API exception: {str(e)}")
+            return None
+        finally:
+            conn.close()
+
     def search_property(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
         """
         Search for a specific property on Realtor.com
+        First searches by address, then gets full details
         Returns property data including description
         """
         # Search by full address
@@ -74,13 +111,31 @@ class RealtorAPI:
 
         # Try to find exact match
         address_lower = address.lower()
+        matched_prop = None
+
         for prop in properties:
             prop_address = prop.get('location', {}).get('address', {}).get('line', '')
             if prop_address and address_lower in prop_address.lower():
-                return prop
+                matched_prop = prop
+                break
 
-        # Return first result as fallback
-        return properties[0] if properties else None
+        # Use first result as fallback
+        if not matched_prop and properties:
+            matched_prop = properties[0]
+
+        if not matched_prop:
+            return None
+
+        # Get property_id and fetch full details
+        property_id = matched_prop.get('property_id')
+        if property_id:
+            # Fetch full details which should include description
+            detail = self.get_property_detail(property_id)
+            if detail:
+                return detail
+
+        # Fallback to search result if detail fetch failed
+        return matched_prop
 
     def get_property_description(self, address: str, city: str, state: str, zipcode: str) -> Optional[str]:
         """

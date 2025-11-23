@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 # Import additional API clients
 from realtor_api import RealtorAPI
 from redfin_api import RedfinAPI
+from ai_scraper_api import AIScraperAPI
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +36,7 @@ class ZillowPropertyAnalyzer:
         # Initialize additional API clients for description fetching
         self.realtor_api = RealtorAPI()
         self.redfin_api = RedfinAPI()
+        self.ai_scraper = AIScraperAPI()
     
     def get_property_data(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
         """
@@ -437,6 +439,23 @@ class ZillowPropertyAnalyzer:
                         description_text = redfin_desc
                         source_found = "Redfin"
                         print(f"   ✅ Description found on Redfin")
+
+                # ATTEMPT 4: Try AI Web Scraper as last resort
+                if not description_text:
+                    print(f"   🔄 APIs failed, trying AI web scraper...")
+                    # Construct property URLs for scraping
+                    zpid = prop.get('zpid', '')
+                    zillow_url = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else None
+                    realtor_url = f"https://www.realtor.com/realestateandhomes-detail/{realtor_property_id}" if realtor_property_id else None
+
+                    scraper_desc = self.ai_scraper.get_property_description(
+                        zillow_url=zillow_url,
+                        realtor_url=realtor_url
+                    )
+                    if scraper_desc:
+                        description_text = scraper_desc
+                        source_found = "AI Web Scraper"
+                        print(f"   ✅ Description extracted via AI scraper")
 
             print(f"   📝 Description: {'Yes (' + str(len(description_text)) + ' chars from ' + source_found + ')' if description_text else 'No description found from any source'}")
             if description_text:

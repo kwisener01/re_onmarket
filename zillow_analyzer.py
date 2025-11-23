@@ -152,10 +152,14 @@ class ZillowPropertyAnalyzer:
             "price_to_arv_ratio": round(price_to_arv, 3)
         }
     
-    def analyze_property(self, address: str, city: str, state: str, zipcode: str) -> Dict:
+    def analyze_property(self, address: str, city: str, state: str, zipcode: str, search_data: Dict = None) -> Dict:
         """
         Complete property analysis
-        
+
+        Args:
+            address, city, state, zipcode: Property location
+            search_data: Optional data from search results to use as fallback
+
         Returns comprehensive investor brief
         """
         # Get raw Zillow data
@@ -182,14 +186,60 @@ class ZillowPropertyAnalyzer:
                 prop = zillow_data['property']
             else:
                 prop = zillow_data
-            
-            # Extract fields (adjust based on actual response)
-            beds = prop.get('bedrooms', prop.get('beds', 0))
-            baths = prop.get('bathrooms', prop.get('baths', 0))
-            sqft = prop.get('livingArea', prop.get('sqft', prop.get('squareFeet', 0)))
-            year_built = prop.get('yearBuilt', prop.get('year_built', 2000))
-            list_price = prop.get('price', prop.get('listPrice', 0))
-            zestimate = prop.get('zestimate', prop.get('estimate', list_price))
+
+            # Helper function to try multiple field names
+            def extract_field(prop_dict, *field_names, default=0):
+                """Try multiple field names and return first non-zero value"""
+                for field in field_names:
+                    if '.' in field:
+                        # Handle nested fields like 'price.value'
+                        parts = field.split('.')
+                        val = prop_dict
+                        for part in parts:
+                            if isinstance(val, dict):
+                                val = val.get(part)
+                            else:
+                                val = None
+                                break
+                        if val is not None and val != 0:
+                            return val
+                    else:
+                        val = prop_dict.get(field)
+                        if val is not None and val != 0:
+                            return val
+                return default
+
+            # Extract fields with multiple fallbacks
+            beds = extract_field(prop, 'bedrooms', 'beds', 'bedroomsCount', 'numBedrooms', default=3)
+            baths = extract_field(prop, 'bathrooms', 'baths', 'bathroomsCount', 'numBathrooms', default=2)
+            sqft = extract_field(prop, 'livingArea', 'sqft', 'squareFeet', 'floorArea', 'livingAreaSqFt', 'resoFacts.livingArea', default=1500)
+            year_built = extract_field(prop, 'yearBuilt', 'year_built', 'yearBuilt', 'resoFacts.yearBuilt', default=2000)
+
+            # Price extraction (can be nested)
+            list_price = extract_field(prop, 'price.value', 'price', 'listPrice', 'askingPrice', 'currentPrice', default=0)
+
+            # Zestimate extraction
+            zestimate = extract_field(prop, 'zestimate', 'homeValue', 'estimate', 'estimatedValue', 'valuation', default=list_price)
+
+            # Use search data as fallback if API didn't return values
+            if search_data:
+                if beds in [0, 3]:  # 3 is default, use search data if available
+                    beds = search_data.get('beds', beds)
+                if baths in [0, 2]:
+                    baths = search_data.get('baths', baths)
+                if sqft in [0, 1500]:
+                    sqft = search_data.get('sqft', sqft)
+                if list_price == 0:
+                    list_price = search_data.get('price', 0)
+                if zestimate in [0, list_price]:
+                    # Estimate zestimate as 110% of list price if not available
+                    zestimate = search_data.get('zestimate', list_price * 1.1 if list_price > 0 else 0)
+
+            # Debug logging
+            print(f"🔍 Extracted values:")
+            print(f"   Beds: {beds}, Baths: {baths}, Sqft: {sqft}")
+            print(f"   Year: {year_built}, Price: ${list_price:,}, Zestimate: ${zestimate:,}")
+            print()
             
             # Conservative ARV (95% of Zestimate)
             arv_conservative = zestimate * 0.95

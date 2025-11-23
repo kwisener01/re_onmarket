@@ -167,11 +167,13 @@ class DealFinder:
             print(f"   List Price: ${prop['price']:,}")
 
             # Analyze property (1 API call)
+            # Pass search data as fallback in case API doesn't return all fields
             analysis = self.analyzer.analyze_property(
                 address=prop['address'],
                 city=prop['city'],
                 state=prop['state'],
-                zipcode=prop['zipcode']
+                zipcode=prop['zipcode'],
+                search_data=prop  # Pass search data with known values
             )
             results['api_calls'] += 1
 

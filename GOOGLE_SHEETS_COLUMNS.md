@@ -111,13 +111,20 @@ The code ensures perfect alignment between headers and data:
 
 ## Fixer Keyword Detection
 
-The system scans property descriptions for 20+ keywords. If **ANY** keyword is found:
+The system scans property descriptions for 40+ keywords. If **ANY** keyword is found:
 - **"Is Fixer?"** column shows **YES**
-- **"Keywords Found"** column lists all matching keywords (e.g., "fixer, TLC, as-is")
+- **"Keywords Found"** column lists all matching keywords (e.g., "fix and flip, cash only, major renovations")
 
-Keywords detected:
-- **Direct:** fixer, fixer-upper, handyman special, handyman's special
-- **Condition:** TLC, needs work, as-is, as is, rehab, renovation
-- **Sales type:** cash only, foreclosure, short sale, estate sale
-- **Marketing:** investor special, investor opportunity, motivated seller, must sell
-- **Distress:** bring all offers, priced to sell, reduced, price reduction
+Keywords detected include:
+- **Primary fixer terms:** fixer, fixer-upper, fix and flip, fix, flip
+- **Handyman terms:** handyman special, handyman's special, handy man
+- **Work needed:** TLC, needs work, needs repair, needs renovation, major renovations
+- **Condition:** as-is, sold as-is
+- **Investor language:** investor special, investor opportunity, investor dream, investors dream
+- **Cash terms:** cash only, cash buyer
+- **Renovation terms:** rehab, renovation, renovations, gut renovation, gut
+- **Opportunity signals:** flip opportunity, high potential, so much potential, cosmetic updates
+- **Price signals:** below market, motivated seller, must sell, bring all offers, priced to sell
+- **Distressed sales:** estate sale, foreclosure, bank owned, short sale
+
+The system checks 8+ possible description fields in the Zillow API response to ensure maximum detection accuracy.

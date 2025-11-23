@@ -226,13 +226,14 @@ class ZillowPropertyAnalyzer:
             "price_to_arv_ratio": round(price_to_arv, 3)
         }
     
-    def analyze_property(self, address: str, city: str, state: str, zipcode: str, search_data: Dict = None) -> Dict:
+    def analyze_property(self, address: str, city: str, state: str, zipcode: str, search_data: Dict = None, description_source: str = 'auto') -> Dict:
         """
         Complete property analysis
 
         Args:
             address, city, state, zipcode: Property location
             search_data: Optional data from search results to use as fallback
+            description_source: Which API to prefer for descriptions ('auto', 'zillow', 'realtor', 'redfin')
 
         Returns comprehensive investor brief
         """
@@ -346,51 +347,87 @@ class ZillowPropertyAnalyzer:
                 best_scenario = "Not a Deal"
                 best_profit = profit_heavy
 
-            # Extract description for keyword detection - try multiple sources
+            # Extract description for keyword detection - respect user's API preference
             description_text = ""
-            description_source = "None"
+            source_found = "None"
 
-            # ATTEMPT 1: Check Zillow response for description fields
+            # Define possible description fields for Zillow
             possible_fields = [
                 'description', 'remarks', 'propertyDescription',
                 'listingDescription', 'publicRemarks', 'agentRemarks',
                 'mlsDescription', 'listing_description'
             ]
 
-            for field in possible_fields:
-                if field in prop and prop.get(field):
-                    description_text = str(prop.get(field))
-                    description_source = "Zillow"
-                    break
-
-            # Also check nested structures in Zillow
-            if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
-                listing = prop['listing']
+            # Apply user's preference
+            if description_source == 'zillow':
+                # Only try Zillow
                 for field in possible_fields:
-                    if field in listing and listing.get(field):
-                        description_text = str(listing.get(field))
-                        description_source = "Zillow (nested)"
+                    if field in prop and prop.get(field):
+                        description_text = str(prop.get(field))
+                        source_found = "Zillow"
                         break
+                if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
+                    listing = prop['listing']
+                    for field in possible_fields:
+                        if field in listing and listing.get(field):
+                            description_text = str(listing.get(field))
+                            source_found = "Zillow (nested)"
+                            break
 
-            # ATTEMPT 2: Try Realtor.com API if Zillow didn't have description
-            if not description_text:
-                print(f"   🔄 Zillow description not found, trying Realtor.com...")
+            elif description_source == 'realtor':
+                # Prefer Realtor.com
+                print(f"   🔄 Fetching description from Realtor.com (user preference)...")
                 realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
                 if realtor_desc:
                     description_text = realtor_desc
-                    description_source = "Realtor.com"
+                    source_found = "Realtor.com"
                     print(f"   ✅ Description found on Realtor.com")
 
-            # ATTEMPT 3: Try Redfin API if still no description
-            if not description_text:
-                print(f"   🔄 Trying Redfin...")
+            elif description_source == 'redfin':
+                # Prefer Redfin
+                print(f"   🔄 Fetching description from Redfin (user preference)...")
                 redfin_desc = self.redfin_api.get_property_description(address, city, state, zipcode)
                 if redfin_desc:
                     description_text = redfin_desc
-                    description_source = "Redfin"
+                    source_found = "Redfin"
                     print(f"   ✅ Description found on Redfin")
 
-            print(f"   📝 Description: {'Yes (' + str(len(description_text)) + ' chars from ' + description_source + ')' if description_text else 'No description found from any source'}")
+            else:  # 'auto' - waterfall approach
+                # ATTEMPT 1: Check Zillow response for description fields
+                for field in possible_fields:
+                    if field in prop and prop.get(field):
+                        description_text = str(prop.get(field))
+                        source_found = "Zillow"
+                        break
+
+                # Also check nested structures in Zillow
+                if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
+                    listing = prop['listing']
+                    for field in possible_fields:
+                        if field in listing and listing.get(field):
+                            description_text = str(listing.get(field))
+                            source_found = "Zillow (nested)"
+                            break
+
+                # ATTEMPT 2: Try Realtor.com API if Zillow didn't have description
+                if not description_text:
+                    print(f"   🔄 Zillow description not found, trying Realtor.com...")
+                    realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                    if realtor_desc:
+                        description_text = realtor_desc
+                        source_found = "Realtor.com"
+                        print(f"   ✅ Description found on Realtor.com")
+
+                # ATTEMPT 3: Try Redfin API if still no description
+                if not description_text:
+                    print(f"   🔄 Trying Redfin...")
+                    redfin_desc = self.redfin_api.get_property_description(address, city, state, zipcode)
+                    if redfin_desc:
+                        description_text = redfin_desc
+                        source_found = "Redfin"
+                        print(f"   ✅ Description found on Redfin")
+
+            print(f"   📝 Description: {'Yes (' + str(len(description_text)) + ' chars from ' + source_found + ')' if description_text else 'No description found from any source'}")
             if description_text:
                 # Show first 150 chars of description for debugging
                 preview = description_text[:150].replace('\n', ' ').strip()

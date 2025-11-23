@@ -6,7 +6,8 @@ Fetches property descriptions and additional data from Realtor.com
 import http.client
 import json
 import os
-from typing import Dict, Optional
+import urllib.parse
+from typing import Dict, Optional, List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,13 +17,13 @@ class RealtorAPI:
     """Realtor.com API client for property data"""
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv('REALTOR_API_KEY')
-        self.api_host = "realtor.p.rapidapi.com"
+        self.api_key = api_key or os.getenv('REALTOR_API_KEY') or os.getenv('ZILLOW_API_KEY')
+        self.api_host = "realtor-com4.p.rapidapi.com"
 
-    def search_property(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
+    def search_properties(self, location: str, limit: int = 20) -> Optional[List[Dict]]:
         """
-        Search for property on Realtor.com
-        Returns property data including description
+        Search for properties on Realtor.com by location
+        Returns list of properties
         """
         if not self.api_key:
             print("⚠️  Realtor API key not configured")
@@ -31,23 +32,24 @@ class RealtorAPI:
         try:
             conn = http.client.HTTPSConnection(self.api_host)
 
-            # Format search query
-            query = f"{address}, {city}, {state} {zipcode}"
+            # Format location for URL
+            encoded_location = urllib.parse.quote(location)
 
             headers = {
                 'x-rapidapi-key': self.api_key,
                 'x-rapidapi-host': self.api_host
             }
 
-            # Use property detail endpoint
-            endpoint = f"/properties/v3/detail?property_id={query}"
+            # Use list endpoint
+            endpoint = f"/properties/list_v2?location={encoded_location}&limit={limit}"
 
             conn.request("GET", endpoint, headers=headers)
             res = conn.getresponse()
             data = res.read()
 
             if res.status == 200:
-                return json.loads(data.decode("utf-8"))
+                response = json.loads(data.decode("utf-8"))
+                return response.get('data', {}).get('results', [])
             else:
                 print(f"⚠️  Realtor API error: {res.status}")
                 return None
@@ -57,6 +59,28 @@ class RealtorAPI:
             return None
         finally:
             conn.close()
+
+    def search_property(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
+        """
+        Search for a specific property on Realtor.com
+        Returns property data including description
+        """
+        # Search by full address
+        full_address = f"{address}, {city}, {state} {zipcode}"
+        properties = self.search_properties(full_address, limit=5)
+
+        if not properties:
+            return None
+
+        # Try to find exact match
+        address_lower = address.lower()
+        for prop in properties:
+            prop_address = prop.get('location', {}).get('address', {}).get('line', '')
+            if prop_address and address_lower in prop_address.lower():
+                return prop
+
+        # Return first result as fallback
+        return properties[0] if properties else None
 
     def get_property_description(self, address: str, city: str, state: str, zipcode: str) -> Optional[str]:
         """
@@ -73,7 +97,7 @@ class RealtorAPI:
             'description',
             'public_remarks',
             'remarks',
-            'listing_description',
+            'listing_remarks',
             'property_description'
         ]
 
@@ -82,16 +106,18 @@ class RealtorAPI:
             if field in property_data and property_data[field]:
                 return str(property_data[field])
 
+        # Check nested in description object
+        if 'description' in property_data and isinstance(property_data['description'], dict):
+            desc = property_data['description']
+            for field in ['text', 'value', 'remarks']:
+                if field in desc and desc[field]:
+                    return str(desc[field])
+
         # Check nested in listing
         if 'listing' in property_data and isinstance(property_data['listing'], dict):
+            listing = property_data['listing']
             for field in description_fields:
-                if field in property_data['listing'] and property_data['listing'][field]:
-                    return str(property_data['listing'][field])
-
-        # Check nested in data
-        if 'data' in property_data and isinstance(property_data['data'], dict):
-            for field in description_fields:
-                if field in property_data['data'] and property_data['data'][field]:
-                    return str(property_data['data'][field])
+                if field in listing and listing[field]:
+                    return str(listing[field])
 
         return None

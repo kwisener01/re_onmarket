@@ -358,6 +358,17 @@
                     <div class="helper-text">Filter for properties with keywords like "fixer", "handyman special", "TLC", "as-is", etc.</div>
                 </div>
 
+                <div class="form-group">
+                    <label for="description_source">Property Description Source</label>
+                    <select id="description_source" name="description_source">
+                        <option value="auto">Auto (Try All - Recommended)</option>
+                        <option value="zillow">Zillow Only</option>
+                        <option value="realtor">Realtor.com (Preferred)</option>
+                        <option value="redfin">Redfin (Free Fallback)</option>
+                    </select>
+                    <div class="helper-text">Choose which API to use for property descriptions. "Auto" tries Zillow → Realtor → Redfin.</div>
+                </div>
+
                 <button type="submit" class="btn" id="submitBtn">
                     🔍 Find Investment Deals
                 </button>

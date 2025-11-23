@@ -43,6 +43,7 @@ class DealFinder:
         check_price_history: bool = True,
         check_rental: bool = True,
         fixer_only: bool = False,
+        description_source: str = 'auto',
         save_file: str = None
     ) -> Dict:
         """
@@ -60,6 +61,7 @@ class DealFinder:
             check_price_history: Check price trends for top deals (default: True)
             check_rental: Analyze rental potential for top deals (default: True)
             fixer_only: Only include properties with fixer keywords (default: False)
+            description_source: API preference for descriptions: 'auto', 'zillow', 'realtor', 'redfin' (default: 'auto')
             save_file: Save results to JSON file
 
         Returns:
@@ -177,7 +179,8 @@ class DealFinder:
                 city=prop['city'],
                 state=prop['state'],
                 zipcode=prop['zipcode'],
-                search_data=prop  # Pass search data with known values
+                search_data=prop,  # Pass search data with known values
+                description_source=description_source  # Pass user's API preference
             )
             results['api_calls'] += 1
 

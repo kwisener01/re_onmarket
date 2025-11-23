@@ -37,8 +37,8 @@ class DealFinder:
         max_price: int = None,
         beds_min: int = None,
         baths_min: int = None,
-        initial_screen: int = 20,
-        deep_analyze: int = 5,
+        initial_screen: int = 40,
+        deep_analyze: int = 20,
         min_deal_score: int = 6,
         check_price_history: bool = True,
         check_rental: bool = True,
@@ -53,8 +53,8 @@ class DealFinder:
             max_price: Maximum price
             beds_min: Minimum bedrooms
             baths_min: Minimum bathrooms
-            initial_screen: Number of properties to quick-screen (default: 20)
-            deep_analyze: Number of top properties to deep-analyze (default: 5)
+            initial_screen: Number of properties to quick-screen (default: 40)
+            deep_analyze: Number of top properties to deep-analyze (default: 20)
             min_deal_score: Minimum deal score to consider (default: 6)
             check_price_history: Check price trends for top deals (default: True)
             check_rental: Analyze rental potential for top deals (default: True)
@@ -330,8 +330,8 @@ Workflow:
     parser.add_argument('--beds', type=int, help='Minimum bedrooms')
     parser.add_argument('--baths', type=int, help='Minimum bathrooms')
 
-    parser.add_argument('--screen', type=int, default=20, help='Number of properties to quick-screen (default: 20)')
-    parser.add_argument('--analyze', type=int, default=5, help='Number of properties to analyze in detail (default: 5)')
+    parser.add_argument('--screen', type=int, default=40, help='Number of properties to quick-screen (default: 40)')
+    parser.add_argument('--analyze', type=int, default=20, help='Number of properties to analyze in detail (default: 20)')
     parser.add_argument('--min-score', type=int, default=6, help='Minimum deal score for deep analysis (default: 6)')
 
     parser.add_argument('--no-history', action='store_true', help='Skip price history analysis')

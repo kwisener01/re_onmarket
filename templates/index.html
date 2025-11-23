@@ -327,13 +327,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="screen_count">Properties to Screen</label>
-                        <input type="number" id="screen_count" name="screen_count" value="20" min="1" max="40">
-                        <div class="helper-text">How many properties to initially review</div>
+                        <input type="number" id="screen_count" name="screen_count" value="40" min="1" max="100">
+                        <div class="helper-text">How many properties to initially review (API returns max 40)</div>
                     </div>
                     <div class="form-group">
                         <label for="analyze_count">Properties to Analyze</label>
-                        <input type="number" id="analyze_count" name="analyze_count" value="10" min="1" max="20">
-                        <div class="helper-text">How many to deeply analyze</div>
+                        <input type="number" id="analyze_count" name="analyze_count" value="20" min="1" max="50">
+                        <div class="helper-text">How many to deeply analyze (more = more API calls)</div>
                     </div>
                 </div>
 

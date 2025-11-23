@@ -535,6 +535,11 @@ class ZillowPropertyAnalyzer:
                     "keywords_found": keyword_analysis['keywords_found'],
                     "keyword_count": keyword_analysis['keyword_count']
                 },
+                "description": {
+                    "text": description_text if description_text else "",
+                    "source": source_found,
+                    "length": len(description_text) if description_text else 0
+                },
                 "deal_quality": deal_score,
                 "analysis_date": datetime.now().isoformat()
             }

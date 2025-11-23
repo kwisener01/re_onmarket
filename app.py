@@ -112,6 +112,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             'Profit Light', 'Profit Medium', 'Profit Heavy',
             'Best Scenario', 'Best Profit',
             'Is Fixer?', 'Keywords Found',
+            'Description Source', 'Property Description',
             'Deal Score', 'Deal Grade', 'Recommendation',
             'Monthly Rent', 'Cash Flow', 'Cash-on-Cash %', 'Cap Rate %',
             'Price Trend', '1-Year Change %'
@@ -163,6 +164,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             price_hist = prop.get('price_history', {})
             keywords_data = analysis.get('keywords', {})
             api_source = analysis.get('api_source', {})
+            description_data = analysis.get('description', {})
 
             # Generate appropriate property URL based on data source
             property_url = ""
@@ -205,6 +207,9 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 # Keywords
                 'YES' if keywords_data.get('is_fixer', False) else 'NO',
                 ', '.join(keywords_data.get('keywords_found', [])) if keywords_data.get('keywords_found') else '',
+                # Description
+                description_data.get('source', 'None'),
+                description_data.get('text', ''),
                 # Deal quality
                 deal.get('score', 0),
                 deal.get('label', ''),

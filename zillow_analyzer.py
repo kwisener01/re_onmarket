@@ -1,6 +1,7 @@
 """
-FYNIX Property Analyzer - Zillow API Integration
-Analyzes investment properties and calculates MAO using 70% rule
+FYNIX Property Analyzer - Multi-Source API Integration
+Analyzes investment properties using Zillow, Realtor.com, and Redfin APIs
+Calculates MAO using 70% rule and detects fixer-upper keywords
 """
 
 import sys
@@ -13,19 +14,27 @@ from typing import Dict, Optional
 import os
 from dotenv import load_dotenv
 
+# Import additional API clients
+from realtor_api import RealtorAPI
+from redfin_api import RedfinAPI
+
 # Load environment variables
 load_dotenv()
 
 
 class ZillowPropertyAnalyzer:
-    """Analyzes investment properties using Zillow API"""
-    
+    """Analyzes investment properties using multiple API sources"""
+
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv('ZILLOW_API_KEY')
         self.api_host = "zillow-working-api.p.rapidapi.com"
-        
+
         if not self.api_key:
             raise ValueError("API key not found. Set ZILLOW_API_KEY in .env file")
+
+        # Initialize additional API clients for description fetching
+        self.realtor_api = RealtorAPI()
+        self.redfin_api = RedfinAPI()
     
     def get_property_data(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
         """
@@ -337,8 +346,11 @@ class ZillowPropertyAnalyzer:
                 best_scenario = "Not a Deal"
                 best_profit = profit_heavy
 
-            # Extract description for keyword detection - check multiple possible fields
+            # Extract description for keyword detection - try multiple sources
             description_text = ""
+            description_source = "None"
+
+            # ATTEMPT 1: Check Zillow response for description fields
             possible_fields = [
                 'description', 'remarks', 'propertyDescription',
                 'listingDescription', 'publicRemarks', 'agentRemarks',
@@ -348,20 +360,40 @@ class ZillowPropertyAnalyzer:
             for field in possible_fields:
                 if field in prop and prop.get(field):
                     description_text = str(prop.get(field))
+                    description_source = "Zillow"
                     break
 
-            # Also check nested structures
+            # Also check nested structures in Zillow
             if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
                 listing = prop['listing']
                 for field in possible_fields:
                     if field in listing and listing.get(field):
                         description_text = str(listing.get(field))
+                        description_source = "Zillow (nested)"
                         break
 
-            print(f"   📝 Description text found: {'Yes (' + str(len(description_text)) + ' chars)' if description_text else 'No'}")
+            # ATTEMPT 2: Try Realtor.com API if Zillow didn't have description
+            if not description_text:
+                print(f"   🔄 Zillow description not found, trying Realtor.com...")
+                realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                if realtor_desc:
+                    description_text = realtor_desc
+                    description_source = "Realtor.com"
+                    print(f"   ✅ Description found on Realtor.com")
+
+            # ATTEMPT 3: Try Redfin API if still no description
+            if not description_text:
+                print(f"   🔄 Trying Redfin...")
+                redfin_desc = self.redfin_api.get_property_description(address, city, state, zipcode)
+                if redfin_desc:
+                    description_text = redfin_desc
+                    description_source = "Redfin"
+                    print(f"   ✅ Description found on Redfin")
+
+            print(f"   📝 Description: {'Yes (' + str(len(description_text)) + ' chars from ' + description_source + ')' if description_text else 'No description found from any source'}")
             if description_text:
-                # Show first 100 chars of description for debugging
-                preview = description_text[:100].replace('\n', ' ').strip()
+                # Show first 150 chars of description for debugging
+                preview = description_text[:150].replace('\n', ' ').strip()
                 print(f"   📄 Preview: {preview}...")
 
             # Detect fixer keywords

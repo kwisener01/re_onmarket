@@ -102,11 +102,15 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                         except:
                             pass  # Skip if date parsing fails
 
-        # Header row with Date Pulled as first column
+        # Header row with Date Pulled as first column + All Rehab Scenarios
         headers = [
             'Date Pulled', 'Search Location', 'Rank', 'Address', 'City', 'State', 'ZIP',
             'List Price', 'Beds', 'Baths', 'Sqft', 'Price/Sqft',
-            'Zestimate (ARV)', 'MAO (70%)', 'Profit Potential', 'ROI %',
+            'Zestimate (ARV)',
+            'MAO Light ($25/sqft)', 'MAO Medium ($40/sqft)', 'MAO Heavy ($60/sqft)',
+            'Profit Light', 'Profit Medium', 'Profit Heavy',
+            'Best Scenario', 'Best Profit',
+            'Is Fixer?', 'Keywords Found',
             'Deal Score', 'Deal Grade', 'Recommendation',
             'Monthly Rent', 'Cash Flow', 'Cash-on-Cash %', 'Cap Rate %',
             'Price Trend', '1-Year Change %'
@@ -156,6 +160,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             deal = analysis.get('deal_quality', {})
             rental = prop.get('rental_analysis', {})
             price_hist = prop.get('price_history', {})
+            keywords_data = analysis.get('keywords', {})
 
             row = [
                 timestamp,  # Date Pulled
@@ -171,16 +176,30 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 property_data.get('sqft', 0),
                 prop.get('price_per_sqft', 0),
                 valuation.get('zestimate', 0),
-                investor.get('mao_70_percent', 0),
-                investor.get('profit_potential', 0),
-                investor.get('roi_percentage', 0),
+                # All three MAO scenarios
+                investor.get('mao_light_rehab', 0),
+                investor.get('mao_medium_rehab', 0),
+                investor.get('mao_heavy_rehab', 0),
+                # Profit for each scenario
+                investor.get('profit_light', 0),
+                investor.get('profit_medium', 0),
+                investor.get('profit_heavy', 0),
+                # Best scenario
+                investor.get('best_scenario', ''),
+                investor.get('best_profit', 0),
+                # Keywords
+                'YES' if keywords_data.get('is_fixer', False) else 'NO',
+                ', '.join(keywords_data.get('keywords_found', [])) if keywords_data.get('keywords_found') else '',
+                # Deal quality
                 deal.get('score', 0),
                 deal.get('label', ''),
                 deal.get('recommendation', ''),
+                # Rental analysis
                 rental.get('income', {}).get('monthly_rent', 0) if rental else 0,
                 rental.get('cash_flow', {}).get('monthly_cash_flow', 0) if rental else 0,
                 rental.get('roi_metrics', {}).get('cash_on_cash_return', 0) if rental else 0,
                 rental.get('roi_metrics', {}).get('cap_rate', 0) if rental else 0,
+                # Price trends
                 price_hist.get('trend', '') if price_hist else '',
                 price_hist.get('one_year_change_pct', 0) if price_hist else 0
             ]
@@ -196,8 +215,8 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             else:
                 # Write headers + data rows
                 worksheet.update('A1', rows)
-                # Format header row
-                worksheet.format('A1:X1', {
+                # Format header row (now with more columns for all scenarios)
+                worksheet.format('A1:AD1', {
                     'textFormat': {'bold': True},
                     'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9}
                 })

@@ -69,34 +69,73 @@ class ZillowPropertyAnalyzer:
         finally:
             conn.close()
     
+    def detect_fixer_keywords(self, text: str) -> Dict:
+        """
+        Detect keywords that indicate a fixer-upper property
+        Returns matches and a flag
+        """
+        if not text:
+            return {"is_fixer": False, "keywords_found": [], "keyword_count": 0}
+
+        text_lower = text.lower()
+
+        fixer_keywords = [
+            "fixer", "fixer-upper", "fixer upper", "fixerupper",
+            "handyman special", "handyman's special", "handy man",
+            "tlc", "needs tlc", "needs work", "needs updating",
+            "as-is", "as is", "sold as-is",
+            "investor special", "investor opportunity",
+            "cash only", "needs repair", "needs renovation",
+            "flip opportunity", "bring your hammer",
+            "cosmetic updates needed", "potential",
+            "below market", "motivated seller",
+            "rehab", "renovation opportunity", "gut",
+            "estate sale", "foreclosure", "bank owned"
+        ]
+
+        found = []
+        for keyword in fixer_keywords:
+            if keyword in text_lower:
+                found.append(keyword)
+
+        return {
+            "is_fixer": len(found) > 0,
+            "keywords_found": found,
+            "keyword_count": len(found)
+        }
+
     def calculate_rehab_estimate(self, year_built: int, sqft: int) -> Dict:
-        """Estimate rehab costs based on property age"""
+        """
+        Calculate rehab costs for ALL scenarios (Light, Medium, Heavy)
+        Don't pick one - show all possibilities for scanning
+        """
         current_year = datetime.now().year
         property_age = current_year - year_built
-        
+
+        # Calculate all three scenarios
         light = sqft * 25
         medium = sqft * 40
         heavy = sqft * 60
-        
+
+        # Suggest which is most likely based on age, but return all
         if property_age <= 20:
-            recommended = light
-            scope = "Light"
-            description = "Cosmetic: paint, flooring, fixtures"
+            suggested = "Light"
+            description = "Likely cosmetic: paint, flooring, fixtures"
         elif property_age <= 50:
-            recommended = medium
-            scope = "Medium"
-            description = "Kitchen, baths, HVAC, roof"
+            suggested = "Medium"
+            description = "Likely needs: Kitchen, baths, HVAC, roof"
         else:
-            recommended = heavy
-            scope = "Heavy"
-            description = "Full renovation"
-        
+            suggested = "Heavy"
+            description = "Likely needs: Full renovation"
+
         return {
             "light": light,
+            "light_per_sqft": 25,
             "medium": medium,
+            "medium_per_sqft": 40,
             "heavy": heavy,
-            "recommended": recommended,
-            "scope": scope,
+            "heavy_per_sqft": 60,
+            "suggested_scope": suggested,
             "description": description,
             "property_age": property_age
         }
@@ -243,23 +282,51 @@ class ZillowPropertyAnalyzer:
             
             # Conservative ARV (95% of Zestimate)
             arv_conservative = zestimate * 0.95
-            
-            # Calculate rehab
+
+            # Calculate rehab for all scenarios
             rehab = self.calculate_rehab_estimate(year_built, sqft)
-            
-            # Calculate MAO
-            mao_70 = (arv_conservative * 0.70) - rehab['recommended']
-            mao_65 = (arv_conservative * 0.65) - rehab['recommended']
-            mao_75 = (arv_conservative * 0.75) - rehab['recommended']
-            
-            # Calculate profit
-            profit_at_mao = (arv_conservative * 0.70) - list_price
-            roi = (profit_at_mao / list_price * 100) if list_price > 0 else 0
-            
-            # Score deal
+
+            # Calculate MAO for ALL THREE rehab scenarios (Light, Medium, Heavy)
+            # This allows scanner to catch borderline deals
+            mao_light = (arv_conservative * 0.70) - rehab['light']
+            mao_medium = (arv_conservative * 0.70) - rehab['medium']
+            mao_heavy = (arv_conservative * 0.70) - rehab['heavy']
+
+            # Calculate profit for each scenario
+            profit_light = mao_light - list_price
+            profit_medium = mao_medium - list_price
+            profit_heavy = mao_heavy - list_price
+
+            # Determine best scenario
+            if list_price <= mao_light:
+                best_scenario = "Works with Light Rehab"
+                best_profit = profit_light
+            elif list_price <= mao_medium:
+                best_scenario = "Works with Medium Rehab"
+                best_profit = profit_medium
+            elif list_price <= mao_heavy:
+                best_scenario = "Works with Heavy Rehab"
+                best_profit = profit_heavy
+            else:
+                best_scenario = "Not a Deal"
+                best_profit = profit_heavy
+
+            # Extract description for keyword detection
+            description_text = ""
+            if 'description' in prop:
+                description_text = str(prop.get('description', ''))
+            elif 'remarks' in prop:
+                description_text = str(prop.get('remarks', ''))
+            elif 'propertyDescription' in prop:
+                description_text = str(prop.get('propertyDescription', ''))
+
+            # Detect fixer keywords
+            keyword_analysis = self.detect_fixer_keywords(description_text)
+
+            # Score deal (use medium as baseline)
             deal_score = self.calculate_deal_score(list_price, arv_conservative, rehab['property_age'])
             
-            # Build response
+            # Build response with all scenarios
             result = {
                 "success": True,
                 "property": {
@@ -276,19 +343,45 @@ class ZillowPropertyAnalyzer:
                     "arv_conservative": round(arv_conservative, 0),
                     "arv_source": "Zillow Zestimate × 0.95"
                 },
-                "rehab": {
-                    "recommended": round(rehab['recommended'], 0),
-                    "scope": rehab['scope'],
-                    "description": rehab['description'],
-                    "per_sqft": round(rehab['recommended'] / sqft, 2) if sqft > 0 else 0
+                "rehab_scenarios": {
+                    "light": {
+                        "cost": round(rehab['light'], 0),
+                        "per_sqft": rehab['light_per_sqft'],
+                        "description": "Cosmetic: paint, flooring, fixtures"
+                    },
+                    "medium": {
+                        "cost": round(rehab['medium'], 0),
+                        "per_sqft": rehab['medium_per_sqft'],
+                        "description": "Kitchen, baths, HVAC, roof"
+                    },
+                    "heavy": {
+                        "cost": round(rehab['heavy'], 0),
+                        "per_sqft": rehab['heavy_per_sqft'],
+                        "description": "Full renovation, foundation, systems"
+                    },
+                    "suggested": rehab['suggested_scope']
                 },
                 "investor_analysis": {
-                    "mao_70_percent": round(mao_70, 0),
-                    "mao_65_percent": round(mao_65, 0),
-                    "mao_75_percent": round(mao_75, 0),
-                    "recommended_max_offer": round(mao_70, 0),
-                    "profit_potential": round(profit_at_mao, 0),
-                    "roi_percentage": round(roi, 1)
+                    # MAO for each rehab scenario
+                    "mao_light_rehab": round(mao_light, 0),
+                    "mao_medium_rehab": round(mao_medium, 0),
+                    "mao_heavy_rehab": round(mao_heavy, 0),
+                    # Profit for each scenario
+                    "profit_light": round(profit_light, 0),
+                    "profit_medium": round(profit_medium, 0),
+                    "profit_heavy": round(profit_heavy, 0),
+                    # Best scenario
+                    "best_scenario": best_scenario,
+                    "best_profit": round(best_profit, 0),
+                    # Legacy fields (using medium as default)
+                    "mao_70_percent": round(mao_medium, 0),
+                    "profit_potential": round(profit_medium, 0),
+                    "roi_percentage": round((profit_medium / list_price * 100), 1) if list_price > 0 else 0
+                },
+                "keywords": {
+                    "is_fixer": keyword_analysis['is_fixer'],
+                    "keywords_found": keyword_analysis['keywords_found'],
+                    "keyword_count": keyword_analysis['keyword_count']
                 },
                 "deal_quality": deal_score,
                 "analysis_date": datetime.now().isoformat()

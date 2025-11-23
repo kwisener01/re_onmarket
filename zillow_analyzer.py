@@ -80,17 +80,43 @@ class ZillowPropertyAnalyzer:
         text_lower = text.lower()
 
         fixer_keywords = [
+            # Primary fixer terms
             "fixer", "fixer-upper", "fixer upper", "fixerupper",
+            "fix and flip", "flip", "fix",
+
+            # Handyman terms
             "handyman special", "handyman's special", "handy man",
+
+            # TLC and work needed
             "tlc", "needs tlc", "needs work", "needs updating",
-            "as-is", "as is", "sold as-is",
-            "investor special", "investor opportunity",
-            "cash only", "needs repair", "needs renovation",
+            "needs repair", "needs renovation", "needs renovations",
+            "major renovation", "major renovations",
+
+            # As-is condition
+            "as-is", "as is", "sold as-is", "selling as-is",
+
+            # Investor language
+            "investor special", "investor opportunity", "investor dream",
+            "investor's dream", "investors dream",
+
+            # Cash terms
+            "cash only", "cash buyer",
+
+            # Renovation terms
+            "rehab", "renovation", "renovations", "renovation opportunity",
+            "gut renovation", "gut",
+
+            # Opportunity language
             "flip opportunity", "bring your hammer",
-            "cosmetic updates needed", "potential",
-            "below market", "motivated seller",
-            "rehab", "renovation opportunity", "gut",
-            "estate sale", "foreclosure", "bank owned"
+            "cosmetic updates needed", "cosmetic updates",
+            "high potential", "so much potential",
+
+            # Price signals
+            "below market", "motivated seller", "must sell",
+            "bring all offers", "priced to sell",
+
+            # Distressed sales
+            "estate sale", "foreclosure", "bank owned", "short sale"
         ]
 
         found = []
@@ -311,14 +337,28 @@ class ZillowPropertyAnalyzer:
                 best_scenario = "Not a Deal"
                 best_profit = profit_heavy
 
-            # Extract description for keyword detection
+            # Extract description for keyword detection - check multiple possible fields
             description_text = ""
-            if 'description' in prop:
-                description_text = str(prop.get('description', ''))
-            elif 'remarks' in prop:
-                description_text = str(prop.get('remarks', ''))
-            elif 'propertyDescription' in prop:
-                description_text = str(prop.get('propertyDescription', ''))
+            possible_fields = [
+                'description', 'remarks', 'propertyDescription',
+                'listingDescription', 'publicRemarks', 'agentRemarks',
+                'mlsDescription', 'listing_description'
+            ]
+
+            for field in possible_fields:
+                if field in prop and prop.get(field):
+                    description_text = str(prop.get(field))
+                    break
+
+            # Also check nested structures
+            if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
+                listing = prop['listing']
+                for field in possible_fields:
+                    if field in listing and listing.get(field):
+                        description_text = str(listing.get(field))
+                        break
+
+            print(f"   📝 Description text found: {'Yes (' + str(len(description_text)) + ' chars)' if description_text else 'No'}")
 
             # Detect fixer keywords
             keyword_analysis = self.detect_fixer_keywords(description_text)

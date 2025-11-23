@@ -447,11 +447,23 @@
 
             // Google Sheets link
             if (data.sheet_info && data.sheet_info.success) {
-                document.getElementById('sheetLinkDiv').innerHTML = `
+                let sheetHTML = `
                     <a href="${data.sheet_info.url}" target="_blank" class="sheet-link">
                         📊 View Results in Google Sheets
                     </a>
                 `;
+
+                // Show duplicate info if any were skipped
+                if (data.sheet_info.rows_skipped > 0) {
+                    sheetHTML += `
+                        <div style="margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <strong>ℹ️ Duplicate Detection:</strong><br>
+                            ${data.sheet_info.message}
+                        </div>
+                    `;
+                }
+
+                document.getElementById('sheetLinkDiv').innerHTML = sheetHTML;
             }
 
             // Properties

@@ -77,6 +77,31 @@ def save_to_google_sheets(results, spreadsheet_id=None):
         existing_data = worksheet.get_all_values()
         has_headers = len(existing_data) > 0 and existing_data[0]
 
+        # Build index of existing properties with their last pulled date
+        # Key: "address, city, state zip" -> Last date pulled
+        existing_properties = {}
+        if has_headers and len(existing_data) > 1:
+            # Skip header row, index starting from 1
+            for row in existing_data[1:]:
+                if len(row) >= 7:  # Has enough columns
+                    date_str = row[0]  # Date Pulled
+                    address = row[3]   # Address
+                    city = row[4]      # City
+                    state = row[5]     # State
+                    zipcode = row[6]   # ZIP
+
+                    if address:  # Only track if we have an address
+                        # Create unique key
+                        prop_key = f"{address}, {city}, {state} {zipcode}".lower().strip()
+
+                        # Parse date and track most recent
+                        try:
+                            pulled_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+                            if prop_key not in existing_properties or pulled_date > existing_properties[prop_key]:
+                                existing_properties[prop_key] = pulled_date
+                        except:
+                            pass  # Skip if date parsing fails
+
         # Header row with Date Pulled as first column
         headers = [
             'Date Pulled', 'Search Location', 'Rank', 'Address', 'City', 'State', 'ZIP',
@@ -94,15 +119,36 @@ def save_to_google_sheets(results, spreadsheet_id=None):
         if not has_headers:
             rows.append(headers)
 
-        # Add property data with timestamp
+        # Add property data with timestamp and duplicate checking
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        current_time = datetime.now()
         search_location = results['search_criteria']['location']
+
+        skipped_count = 0
 
         for i, prop in enumerate(results.get('all_results', []), 1):
             analysis = prop.get('detailed_analysis', {})
 
             if not analysis.get('success'):
                 continue
+
+            # Check for duplicate
+            address = prop.get('address', '')
+            city = prop.get('city', '')
+            state = prop.get('state', '')
+            zipcode = prop.get('zipcode', '')
+            prop_key = f"{address}, {city}, {state} {zipcode}".lower().strip()
+
+            # Check if property exists and if it was pulled recently
+            if prop_key in existing_properties:
+                last_pulled = existing_properties[prop_key]
+                days_since_pull = (current_time - last_pulled).days
+
+                # Skip if pulled within last 30 days
+                if days_since_pull < 30:
+                    skipped_count += 1
+                    print(f"⏭️  Skipping {address} - Last pulled {days_since_pull} days ago")
+                    continue
 
             property_data = analysis.get('property', {})
             valuation = analysis.get('valuation', {})
@@ -115,10 +161,10 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 timestamp,  # Date Pulled
                 search_location,  # Search Location
                 i,  # Rank
-                prop.get('address', ''),
-                prop.get('city', ''),
-                prop.get('state', ''),
-                prop.get('zipcode', ''),
+                address,
+                city,
+                state,
+                zipcode,
                 prop.get('price', 0),
                 property_data.get('beds', 0),
                 property_data.get('baths', 0),
@@ -140,6 +186,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             ]
 
             rows.append(row)
+            print(f"✅ Adding {address} to sheet")
 
         # Append rows to sheet
         if rows:
@@ -157,13 +204,17 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 # Auto-resize columns
                 worksheet.columns_auto_resize(0, len(headers))
 
+        rows_added = len(rows) - (0 if has_headers else 1)  # Subtract header row if added
+
         return {
             'success': True,
             'url': spreadsheet.url,
             'sheet_id': sheet_id,
             'worksheet': worksheet_name,
-            'rows_added': len(rows) - (0 if has_headers else 1),  # Subtract header row if added
-            'timestamp': timestamp
+            'rows_added': rows_added,
+            'rows_skipped': skipped_count,
+            'timestamp': timestamp,
+            'message': f"Added {rows_added} properties, skipped {skipped_count} duplicates (pulled within 30 days)"
         }
 
     except Exception as e:

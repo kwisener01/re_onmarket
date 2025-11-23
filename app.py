@@ -64,20 +64,22 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             spreadsheet = client.create('FYNIX Deal Finder Results')
             sheet_id = spreadsheet.id
 
-        # Create new worksheet for this search
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        location = results['search_criteria']['location']
-        worksheet_name = f"{location} - {timestamp}"
+        # Use or create a single worksheet for all properties
+        worksheet_name = "All Properties"
 
         try:
-            worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=100, cols=20)
+            worksheet = spreadsheet.worksheet(worksheet_name)
         except:
-            # If worksheet name exists, add a number
-            worksheet = spreadsheet.add_worksheet(title=f"{worksheet_name} (2)", rows=100, cols=20)
+            # Create new worksheet if doesn't exist
+            worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=25)
 
-        # Header row
+        # Check if sheet has headers (check if A1 is empty)
+        existing_data = worksheet.get_all_values()
+        has_headers = len(existing_data) > 0 and existing_data[0]
+
+        # Header row with Date Pulled as first column
         headers = [
-            'Rank', 'Address', 'City', 'State', 'ZIP',
+            'Date Pulled', 'Search Location', 'Rank', 'Address', 'City', 'State', 'ZIP',
             'List Price', 'Beds', 'Baths', 'Sqft', 'Price/Sqft',
             'Zestimate (ARV)', 'MAO (70%)', 'Profit Potential', 'ROI %',
             'Deal Score', 'Deal Grade', 'Recommendation',
@@ -85,9 +87,17 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             'Price Trend', '1-Year Change %'
         ]
 
-        rows = [headers]
+        # Prepare rows to append
+        rows = []
 
-        # Add property data
+        # Add headers only if sheet is empty
+        if not has_headers:
+            rows.append(headers)
+
+        # Add property data with timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        search_location = results['search_criteria']['location']
+
         for i, prop in enumerate(results.get('all_results', []), 1):
             analysis = prop.get('detailed_analysis', {})
 
@@ -102,6 +112,8 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             price_hist = prop.get('price_history', {})
 
             row = [
+                timestamp,  # Date Pulled
+                search_location,  # Search Location
                 i,  # Rank
                 prop.get('address', ''),
                 prop.get('city', ''),
@@ -129,23 +141,29 @@ def save_to_google_sheets(results, spreadsheet_id=None):
 
             rows.append(row)
 
-        # Write to sheet
-        worksheet.update('A1', rows)
-
-        # Format header row
-        worksheet.format('A1:W1', {
-            'textFormat': {'bold': True},
-            'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9}
-        })
-
-        # Auto-resize columns
-        worksheet.columns_auto_resize(0, len(headers))
+        # Append rows to sheet
+        if rows:
+            if has_headers:
+                # Append data rows only (skip headers)
+                worksheet.append_rows(rows, value_input_option='USER_ENTERED')
+            else:
+                # Write headers + data rows
+                worksheet.update('A1', rows)
+                # Format header row
+                worksheet.format('A1:X1', {
+                    'textFormat': {'bold': True},
+                    'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9}
+                })
+                # Auto-resize columns
+                worksheet.columns_auto_resize(0, len(headers))
 
         return {
             'success': True,
             'url': spreadsheet.url,
             'sheet_id': sheet_id,
-            'worksheet': worksheet_name
+            'worksheet': worksheet_name,
+            'rows_added': len(rows) - (0 if has_headers else 1),  # Subtract header row if added
+            'timestamp': timestamp
         }
 
     except Exception as e:

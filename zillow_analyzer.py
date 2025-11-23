@@ -359,9 +359,18 @@ class ZillowPropertyAnalyzer:
                         break
 
             print(f"   📝 Description text found: {'Yes (' + str(len(description_text)) + ' chars)' if description_text else 'No'}")
+            if description_text:
+                # Show first 100 chars of description for debugging
+                preview = description_text[:100].replace('\n', ' ').strip()
+                print(f"   📄 Preview: {preview}...")
 
             # Detect fixer keywords
             keyword_analysis = self.detect_fixer_keywords(description_text)
+
+            if keyword_analysis.get('is_fixer'):
+                print(f"   🔧 FIXER DETECTED! Keywords: {', '.join(keyword_analysis.get('keywords_found', []))}")
+            else:
+                print(f"   ℹ️  No fixer keywords found")
 
             # Score deal (use medium as baseline)
             deal_score = self.calculate_deal_score(list_price, arv_conservative, rehab['property_age'])

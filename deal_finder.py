@@ -42,6 +42,7 @@ class DealFinder:
         min_deal_score: int = 6,
         check_price_history: bool = True,
         check_rental: bool = True,
+        fixer_only: bool = False,
         save_file: str = None
     ) -> Dict:
         """
@@ -58,6 +59,7 @@ class DealFinder:
             min_deal_score: Minimum deal score to consider (default: 6)
             check_price_history: Check price trends for top deals (default: True)
             check_rental: Analyze rental potential for top deals (default: True)
+            fixer_only: Only include properties with fixer keywords (default: False)
             save_file: Save results to JSON file
 
         Returns:
@@ -82,6 +84,8 @@ class DealFinder:
 
         print("\n" + "="*80)
         print("🔍 FYNIX DEAL FINDER - Optimized Workflow")
+        if fixer_only:
+            print("🔧 FILTER: Fixer-Upper Properties Only")
         print("="*80 + "\n")
 
         # STEP 1: Search for properties (1 API call)
@@ -180,6 +184,18 @@ class DealFinder:
             if not analysis.get('success'):
                 print(f"   ❌ Failed to analyze")
                 continue
+
+            # Check fixer filter if enabled
+            if fixer_only:
+                keywords_data = analysis.get('keywords', {})
+                is_fixer = keywords_data.get('is_fixer', False)
+
+                if not is_fixer:
+                    print(f"   ⏭️  Skipping - Not a fixer-upper")
+                    continue
+                else:
+                    keywords_found = keywords_data.get('keywords_found', [])
+                    print(f"   🔧 Fixer keywords: {', '.join(keywords_found)}")
 
             deal_score = analysis['deal_quality']['score']
             recommendation = analysis['deal_quality']['recommendation']

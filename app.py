@@ -260,6 +260,7 @@ def search_properties():
         analyze_count = request.form.get('analyze_count', 5, type=int)
         min_score = request.form.get('min_score', 6, type=int)
         save_to_sheets = request.form.get('save_to_sheets') == 'on'
+        fixer_only = request.form.get('fixer_only') == 'on'
 
         if not location:
             return jsonify({'error': 'Location is required'}), 400
@@ -277,7 +278,8 @@ def search_properties():
             deep_analyze=analyze_count,
             min_deal_score=min_score,
             check_price_history=True,
-            check_rental=True
+            check_rental=True,
+            fixer_only=fixer_only
         )
 
         # Save to Google Sheets if requested
@@ -317,7 +319,8 @@ def api_search():
             baths_min=data.get('baths_min'),
             initial_screen=data.get('screen_count', 20),
             deep_analyze=data.get('analyze_count', 5),
-            min_deal_score=data.get('min_score', 6)
+            min_deal_score=data.get('min_score', 6),
+            fixer_only=data.get('fixer_only', False)
         )
 
         # Auto-save to Google Sheets if configured

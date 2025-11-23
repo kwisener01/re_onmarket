@@ -105,7 +105,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
         # Header row with Date Pulled as first column + All Rehab Scenarios
         headers = [
             'Date Pulled', 'Search Location', 'Rank', 'Address', 'City', 'State', 'ZIP',
-            'Zillow URL',
+            'Property URL',
             'List Price', 'Beds', 'Baths', 'Sqft', 'Price/Sqft',
             'Zestimate (ARV)',
             'MAO Light ($25/sqft)', 'MAO Medium ($40/sqft)', 'MAO Heavy ($60/sqft)',
@@ -162,10 +162,19 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             rental = prop.get('rental_analysis', {})
             price_hist = prop.get('price_history', {})
             keywords_data = analysis.get('keywords', {})
+            api_source = analysis.get('api_source', {})
 
-            # Construct Zillow URL from zpid
+            # Generate appropriate property URL based on data source
+            property_url = ""
+            realtor_property_id = api_source.get('realtor_property_id')
             zpid = prop.get('zpid', '')
-            zillow_url = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else ""
+
+            if realtor_property_id:
+                # Use Realtor.com URL
+                property_url = f"https://www.realtor.com/realestateandhomes-detail/{realtor_property_id}"
+            elif zpid:
+                # Use Zillow URL
+                property_url = f"https://www.zillow.com/homedetails/{zpid}_zpid/"
 
             row = [
                 timestamp,  # Date Pulled
@@ -175,7 +184,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 city,
                 state,
                 zipcode,
-                zillow_url,  # Zillow URL
+                property_url,  # Property URL (Zillow or Realtor.com)
                 prop.get('price', 0),
                 property_data.get('beds', 0),
                 property_data.get('baths', 0),

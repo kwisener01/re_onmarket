@@ -350,6 +350,7 @@ class ZillowPropertyAnalyzer:
             # Extract description for keyword detection - respect user's API preference
             description_text = ""
             source_found = "None"
+            realtor_property_id = None  # Track Realtor.com property ID for URL generation
 
             # Define possible description fields for Zillow
             possible_fields = [
@@ -377,11 +378,16 @@ class ZillowPropertyAnalyzer:
             elif description_source == 'realtor':
                 # Prefer Realtor.com
                 print(f"   🔄 Fetching description from Realtor.com (user preference)...")
-                realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
-                if realtor_desc:
-                    description_text = realtor_desc
-                    source_found = "Realtor.com"
-                    print(f"   ✅ Description found on Realtor.com")
+                realtor_data = self.realtor_api.search_property(address, city, state, zipcode)
+                if realtor_data:
+                    # Extract property_id for URL generation
+                    realtor_property_id = realtor_data.get('property_id')
+                    # Extract description
+                    realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                    if realtor_desc:
+                        description_text = realtor_desc
+                        source_found = "Realtor.com"
+                        print(f"   ✅ Description found on Realtor.com (ID: {realtor_property_id})")
 
             elif description_source == 'redfin':
                 # Prefer Redfin
@@ -412,11 +418,16 @@ class ZillowPropertyAnalyzer:
                 # ATTEMPT 2: Try Realtor.com API if Zillow didn't have description
                 if not description_text:
                     print(f"   🔄 Zillow description not found, trying Realtor.com...")
-                    realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
-                    if realtor_desc:
-                        description_text = realtor_desc
-                        source_found = "Realtor.com"
-                        print(f"   ✅ Description found on Realtor.com")
+                    realtor_data = self.realtor_api.search_property(address, city, state, zipcode)
+                    if realtor_data:
+                        # Extract property_id for URL generation
+                        realtor_property_id = realtor_data.get('property_id')
+                        # Extract description
+                        realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                        if realtor_desc:
+                            description_text = realtor_desc
+                            source_found = "Realtor.com"
+                            print(f"   ✅ Description found on Realtor.com (ID: {realtor_property_id})")
 
                 # ATTEMPT 3: Try Redfin API if still no description
                 if not description_text:
@@ -455,6 +466,10 @@ class ZillowPropertyAnalyzer:
                     "year_built": year_built,
                     "property_age": rehab['property_age'],
                     "list_price": list_price
+                },
+                "api_source": {
+                    "description_source": source_found,
+                    "realtor_property_id": realtor_property_id
                 },
                 "valuation": {
                     "zestimate": zestimate,

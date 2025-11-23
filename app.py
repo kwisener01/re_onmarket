@@ -105,6 +105,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
         # Header row with Date Pulled as first column + All Rehab Scenarios
         headers = [
             'Date Pulled', 'Search Location', 'Rank', 'Address', 'City', 'State', 'ZIP',
+            'Zillow URL',
             'List Price', 'Beds', 'Baths', 'Sqft', 'Price/Sqft',
             'Zestimate (ARV)',
             'MAO Light ($25/sqft)', 'MAO Medium ($40/sqft)', 'MAO Heavy ($60/sqft)',
@@ -162,6 +163,10 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             price_hist = prop.get('price_history', {})
             keywords_data = analysis.get('keywords', {})
 
+            # Construct Zillow URL from zpid
+            zpid = prop.get('zpid', '')
+            zillow_url = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else ""
+
             row = [
                 timestamp,  # Date Pulled
                 search_location,  # Search Location
@@ -170,6 +175,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 city,
                 state,
                 zipcode,
+                zillow_url,  # Zillow URL
                 prop.get('price', 0),
                 property_data.get('beds', 0),
                 property_data.get('baths', 0),
@@ -215,8 +221,8 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             else:
                 # Write headers + data rows
                 worksheet.update('A1', rows)
-                # Format header row (now with more columns for all scenarios)
-                worksheet.format('A1:AD1', {
+                # Format header row (now with more columns for all scenarios + Zillow URL)
+                worksheet.format('A1:AG1', {
                     'textFormat': {'bold': True},
                     'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9}
                 })

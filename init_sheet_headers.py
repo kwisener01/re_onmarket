@@ -52,31 +52,32 @@ def init_headers():
             'City',                  # 5
             'State',                 # 6
             'ZIP',                   # 7
-            'List Price',            # 8
-            'Beds',                  # 9
-            'Baths',                 # 10
-            'Sqft',                  # 11
-            'Price/Sqft',            # 12
-            'Zestimate (ARV)',       # 13
-            'MAO Light ($25/sqft)',  # 14
-            'MAO Medium ($40/sqft)', # 15
-            'MAO Heavy ($60/sqft)',  # 16
-            'Profit Light',          # 17
-            'Profit Medium',         # 18
-            'Profit Heavy',          # 19
-            'Best Scenario',         # 20
-            'Best Profit',           # 21
-            'Is Fixer?',             # 22
-            'Keywords Found',        # 23
-            'Deal Score',            # 24
-            'Deal Grade',            # 25
-            'Recommendation',        # 26
-            'Monthly Rent',          # 27
-            'Cash Flow',             # 28
-            'Cash-on-Cash %',        # 29
-            'Cap Rate %',            # 30
-            'Price Trend',           # 31
-            '1-Year Change %'        # 32
+            'Zillow URL',            # 8
+            'List Price',            # 9
+            'Beds',                  # 10
+            'Baths',                 # 11
+            'Sqft',                  # 12
+            'Price/Sqft',            # 13
+            'Zestimate (ARV)',       # 14
+            'MAO Light ($25/sqft)',  # 15
+            'MAO Medium ($40/sqft)', # 16
+            'MAO Heavy ($60/sqft)',  # 17
+            'Profit Light',          # 18
+            'Profit Medium',         # 19
+            'Profit Heavy',          # 20
+            'Best Scenario',         # 21
+            'Best Profit',           # 22
+            'Is Fixer?',             # 23
+            'Keywords Found',        # 24
+            'Deal Score',            # 25
+            'Deal Grade',            # 26
+            'Recommendation',        # 27
+            'Monthly Rent',          # 28
+            'Cash Flow',             # 29
+            'Cash-on-Cash %',        # 30
+            'Cap Rate %',            # 31
+            'Price Trend',           # 32
+            '1-Year Change %'        # 33
         ]
 
         # Write headers to first row
@@ -84,7 +85,7 @@ def init_headers():
         print(f"✅ Added {len(headers)} column headers")
 
         # Format header row
-        worksheet.format('A1:AF1', {
+        worksheet.format('A1:AG1', {
             'textFormat': {'bold': True, 'fontSize': 11},
             'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9},
             'horizontalAlignment': 'CENTER',
@@ -102,14 +103,15 @@ def init_headers():
 
         print(f"\n✨ Sheet initialized successfully!")
         print(f"🔗 URL: {spreadsheet.url}")
-        print(f"\n📋 Column structure (32 columns):")
+        print(f"\n📋 Column structure (33 columns):")
         print("   Columns 1-7:   Basic Info (Date, Location, Address)")
-        print("   Columns 8-13:  Property Details (Price, Beds, Baths, Sqft, Zestimate)")
-        print("   Columns 14-21: All Rehab Scenarios (Light/Medium/Heavy MAO & Profits)")
-        print("   Columns 22-23: Fixer Keywords Detection")
-        print("   Columns 24-26: Deal Quality (Score, Grade, Recommendation)")
-        print("   Columns 27-30: Rental Analysis")
-        print("   Columns 31-32: Price Trends")
+        print("   Column 8:      Zillow URL (clickable link)")
+        print("   Columns 9-14:  Property Details (Price, Beds, Baths, Sqft, Zestimate)")
+        print("   Columns 15-22: All Rehab Scenarios (Light/Medium/Heavy MAO & Profits)")
+        print("   Columns 23-24: Fixer Keywords Detection")
+        print("   Columns 25-27: Deal Quality (Score, Grade, Recommendation)")
+        print("   Columns 28-31: Rental Analysis")
+        print("   Columns 32-33: Price Trends")
 
         return True
 

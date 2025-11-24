@@ -1,6 +1,7 @@
 """
-FYNIX Property Analyzer - Zillow API Integration
-Analyzes investment properties and calculates MAO using 70% rule
+FYNIX Property Analyzer - Multi-Source API Integration
+Analyzes investment properties using Zillow, Realtor.com, and Redfin APIs
+Calculates MAO using 70% rule and detects fixer-upper keywords
 """
 
 import sys
@@ -13,19 +14,29 @@ from typing import Dict, Optional
 import os
 from dotenv import load_dotenv
 
+# Import additional API clients
+from realtor_api import RealtorAPI
+from redfin_api import RedfinAPI
+from ai_scraper_api import AIScraperAPI
+
 # Load environment variables
 load_dotenv()
 
 
 class ZillowPropertyAnalyzer:
-    """Analyzes investment properties using Zillow API"""
-    
+    """Analyzes investment properties using multiple API sources"""
+
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv('ZILLOW_API_KEY')
         self.api_host = "zillow-working-api.p.rapidapi.com"
-        
+
         if not self.api_key:
             raise ValueError("API key not found. Set ZILLOW_API_KEY in .env file")
+
+        # Initialize additional API clients for description fetching
+        self.realtor_api = RealtorAPI()
+        self.redfin_api = RedfinAPI()
+        self.ai_scraper = AIScraperAPI()
     
     def get_property_data(self, address: str, city: str, state: str, zipcode: str) -> Optional[Dict]:
         """
@@ -69,34 +80,99 @@ class ZillowPropertyAnalyzer:
         finally:
             conn.close()
     
+    def detect_fixer_keywords(self, text: str) -> Dict:
+        """
+        Detect keywords that indicate a fixer-upper property
+        Returns matches and a flag
+        """
+        if not text:
+            return {"is_fixer": False, "keywords_found": [], "keyword_count": 0}
+
+        text_lower = text.lower()
+
+        fixer_keywords = [
+            # Primary fixer terms
+            "fixer", "fixer-upper", "fixer upper", "fixerupper",
+            "fix and flip", "flip", "fix",
+
+            # Handyman terms
+            "handyman special", "handyman's special", "handy man",
+
+            # TLC and work needed
+            "tlc", "needs tlc", "needs work", "needs updating",
+            "needs repair", "needs renovation", "needs renovations",
+            "major renovation", "major renovations",
+
+            # As-is condition
+            "as-is", "as is", "sold as-is", "selling as-is",
+
+            # Investor language
+            "investor special", "investor opportunity", "investor dream",
+            "investor's dream", "investors dream",
+
+            # Cash terms
+            "cash only", "cash buyer",
+
+            # Renovation terms
+            "rehab", "renovation", "renovations", "renovation opportunity",
+            "gut renovation", "gut",
+
+            # Opportunity language
+            "flip opportunity", "bring your hammer",
+            "cosmetic updates needed", "cosmetic updates",
+            "high potential", "so much potential",
+
+            # Price signals
+            "below market", "motivated seller", "must sell",
+            "bring all offers", "priced to sell",
+
+            # Distressed sales
+            "estate sale", "foreclosure", "bank owned", "short sale"
+        ]
+
+        found = []
+        for keyword in fixer_keywords:
+            if keyword in text_lower:
+                found.append(keyword)
+
+        return {
+            "is_fixer": len(found) > 0,
+            "keywords_found": found,
+            "keyword_count": len(found)
+        }
+
     def calculate_rehab_estimate(self, year_built: int, sqft: int) -> Dict:
-        """Estimate rehab costs based on property age"""
+        """
+        Calculate rehab costs for ALL scenarios (Light, Medium, Heavy)
+        Don't pick one - show all possibilities for scanning
+        """
         current_year = datetime.now().year
         property_age = current_year - year_built
-        
+
+        # Calculate all three scenarios
         light = sqft * 25
         medium = sqft * 40
         heavy = sqft * 60
-        
+
+        # Suggest which is most likely based on age, but return all
         if property_age <= 20:
-            recommended = light
-            scope = "Light"
-            description = "Cosmetic: paint, flooring, fixtures"
+            suggested = "Light"
+            description = "Likely cosmetic: paint, flooring, fixtures"
         elif property_age <= 50:
-            recommended = medium
-            scope = "Medium"
-            description = "Kitchen, baths, HVAC, roof"
+            suggested = "Medium"
+            description = "Likely needs: Kitchen, baths, HVAC, roof"
         else:
-            recommended = heavy
-            scope = "Heavy"
-            description = "Full renovation"
-        
+            suggested = "Heavy"
+            description = "Likely needs: Full renovation"
+
         return {
             "light": light,
+            "light_per_sqft": 25,
             "medium": medium,
+            "medium_per_sqft": 40,
             "heavy": heavy,
-            "recommended": recommended,
-            "scope": scope,
+            "heavy_per_sqft": 60,
+            "suggested_scope": suggested,
             "description": description,
             "property_age": property_age
         }
@@ -152,10 +228,15 @@ class ZillowPropertyAnalyzer:
             "price_to_arv_ratio": round(price_to_arv, 3)
         }
     
-    def analyze_property(self, address: str, city: str, state: str, zipcode: str) -> Dict:
+    def analyze_property(self, address: str, city: str, state: str, zipcode: str, search_data: Dict = None, description_source: str = 'auto') -> Dict:
         """
         Complete property analysis
-        
+
+        Args:
+            address, city, state, zipcode: Property location
+            search_data: Optional data from search results to use as fallback
+            description_source: Which API to prefer for descriptions ('auto', 'zillow', 'realtor', 'redfin')
+
         Returns comprehensive investor brief
         """
         # Get raw Zillow data
@@ -182,34 +263,224 @@ class ZillowPropertyAnalyzer:
                 prop = zillow_data['property']
             else:
                 prop = zillow_data
-            
-            # Extract fields (adjust based on actual response)
-            beds = prop.get('bedrooms', prop.get('beds', 0))
-            baths = prop.get('bathrooms', prop.get('baths', 0))
-            sqft = prop.get('livingArea', prop.get('sqft', prop.get('squareFeet', 0)))
-            year_built = prop.get('yearBuilt', prop.get('year_built', 2000))
-            list_price = prop.get('price', prop.get('listPrice', 0))
-            zestimate = prop.get('zestimate', prop.get('estimate', list_price))
+
+            # Helper function to try multiple field names
+            def extract_field(prop_dict, *field_names, default=0):
+                """Try multiple field names and return first non-zero value"""
+                for field in field_names:
+                    if '.' in field:
+                        # Handle nested fields like 'price.value'
+                        parts = field.split('.')
+                        val = prop_dict
+                        for part in parts:
+                            if isinstance(val, dict):
+                                val = val.get(part)
+                            else:
+                                val = None
+                                break
+                        if val is not None and val != 0:
+                            return val
+                    else:
+                        val = prop_dict.get(field)
+                        if val is not None and val != 0:
+                            return val
+                return default
+
+            # Extract fields with multiple fallbacks
+            beds = extract_field(prop, 'bedrooms', 'beds', 'bedroomsCount', 'numBedrooms', default=3)
+            baths = extract_field(prop, 'bathrooms', 'baths', 'bathroomsCount', 'numBathrooms', default=2)
+            sqft = extract_field(prop, 'livingArea', 'sqft', 'squareFeet', 'floorArea', 'livingAreaSqFt', 'resoFacts.livingArea', default=1500)
+            year_built = extract_field(prop, 'yearBuilt', 'year_built', 'yearBuilt', 'resoFacts.yearBuilt', default=2000)
+
+            # Price extraction (can be nested)
+            list_price = extract_field(prop, 'price.value', 'price', 'listPrice', 'askingPrice', 'currentPrice', default=0)
+
+            # Zestimate extraction
+            zestimate = extract_field(prop, 'zestimate', 'homeValue', 'estimate', 'estimatedValue', 'valuation', default=list_price)
+
+            # Rent Zestimate extraction (for rental analysis)
+            rent_zestimate = extract_field(prop, 'rentZestimate', 'rent_zestimate', 'rentalZestimate', 'rental_zestimate',
+                                         'monthlyRent', 'estimatedRent', 'rentEstimate', default=0)
+
+            # Use search data as fallback if API didn't return values
+            if search_data:
+                if beds in [0, 3]:  # 3 is default, use search data if available
+                    beds = search_data.get('beds', beds)
+                if baths in [0, 2]:
+                    baths = search_data.get('baths', baths)
+                if sqft in [0, 1500]:
+                    sqft = search_data.get('sqft', sqft)
+                if list_price == 0:
+                    list_price = search_data.get('price', 0)
+                if zestimate in [0, list_price]:
+                    # Estimate zestimate as 110% of list price if not available
+                    zestimate = search_data.get('zestimate', list_price * 1.1 if list_price > 0 else 0)
+
+            # Debug logging
+            print(f"🔍 Extracted values:")
+            print(f"   Beds: {beds}, Baths: {baths}, Sqft: {sqft}")
+            print(f"   Year: {year_built}, Price: ${list_price:,}, Zestimate: ${zestimate:,}")
+            if rent_zestimate > 0:
+                print(f"   Rent Estimate: ${rent_zestimate:,}/month")
+            print()
             
             # Conservative ARV (95% of Zestimate)
             arv_conservative = zestimate * 0.95
-            
-            # Calculate rehab
+
+            # Calculate rehab for all scenarios
             rehab = self.calculate_rehab_estimate(year_built, sqft)
-            
-            # Calculate MAO
-            mao_70 = (arv_conservative * 0.70) - rehab['recommended']
-            mao_65 = (arv_conservative * 0.65) - rehab['recommended']
-            mao_75 = (arv_conservative * 0.75) - rehab['recommended']
-            
-            # Calculate profit
-            profit_at_mao = (arv_conservative * 0.70) - list_price
-            roi = (profit_at_mao / list_price * 100) if list_price > 0 else 0
-            
-            # Score deal
+
+            # Calculate MAO for ALL THREE rehab scenarios (Light, Medium, Heavy)
+            # This allows scanner to catch borderline deals
+            mao_light = (arv_conservative * 0.70) - rehab['light']
+            mao_medium = (arv_conservative * 0.70) - rehab['medium']
+            mao_heavy = (arv_conservative * 0.70) - rehab['heavy']
+
+            # Calculate profit for each scenario
+            profit_light = mao_light - list_price
+            profit_medium = mao_medium - list_price
+            profit_heavy = mao_heavy - list_price
+
+            # Determine best scenario
+            if list_price <= mao_light:
+                best_scenario = "Works with Light Rehab"
+                best_profit = profit_light
+            elif list_price <= mao_medium:
+                best_scenario = "Works with Medium Rehab"
+                best_profit = profit_medium
+            elif list_price <= mao_heavy:
+                best_scenario = "Works with Heavy Rehab"
+                best_profit = profit_heavy
+            else:
+                best_scenario = "Not a Deal"
+                best_profit = profit_heavy
+
+            # Extract description for keyword detection - respect user's API preference
+            description_text = ""
+            source_found = "None"
+            realtor_property_id = None  # Track Realtor.com property ID for URL generation
+
+            # Define possible description fields for Zillow
+            possible_fields = [
+                'description', 'remarks', 'propertyDescription',
+                'listingDescription', 'publicRemarks', 'agentRemarks',
+                'mlsDescription', 'listing_description'
+            ]
+
+            # Apply user's preference
+            if description_source == 'zillow':
+                # Only try Zillow
+                for field in possible_fields:
+                    if field in prop and prop.get(field):
+                        description_text = str(prop.get(field))
+                        source_found = "Zillow"
+                        break
+                if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
+                    listing = prop['listing']
+                    for field in possible_fields:
+                        if field in listing and listing.get(field):
+                            description_text = str(listing.get(field))
+                            source_found = "Zillow (nested)"
+                            break
+
+            elif description_source == 'realtor':
+                # Prefer Realtor.com
+                print(f"   🔄 Fetching description from Realtor.com (user preference)...")
+                realtor_data = self.realtor_api.search_property(address, city, state, zipcode)
+                if realtor_data:
+                    # Extract property_id for URL generation
+                    realtor_property_id = realtor_data.get('property_id')
+                    # Extract description
+                    realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                    if realtor_desc:
+                        description_text = realtor_desc
+                        source_found = "Realtor.com"
+                        print(f"   ✅ Description found on Realtor.com (ID: {realtor_property_id})")
+
+            elif description_source == 'redfin':
+                # Prefer Redfin
+                print(f"   🔄 Fetching description from Redfin (user preference)...")
+                redfin_desc = self.redfin_api.get_property_description(address, city, state, zipcode)
+                if redfin_desc:
+                    description_text = redfin_desc
+                    source_found = "Redfin"
+                    print(f"   ✅ Description found on Redfin")
+
+            else:  # 'auto' - waterfall approach
+                # ATTEMPT 1: Check Zillow response for description fields
+                for field in possible_fields:
+                    if field in prop and prop.get(field):
+                        description_text = str(prop.get(field))
+                        source_found = "Zillow"
+                        break
+
+                # Also check nested structures in Zillow
+                if not description_text and 'listing' in prop and isinstance(prop['listing'], dict):
+                    listing = prop['listing']
+                    for field in possible_fields:
+                        if field in listing and listing.get(field):
+                            description_text = str(listing.get(field))
+                            source_found = "Zillow (nested)"
+                            break
+
+                # ATTEMPT 2: Try Realtor.com API if Zillow didn't have description
+                if not description_text:
+                    print(f"   🔄 Zillow description not found, trying Realtor.com...")
+                    realtor_data = self.realtor_api.search_property(address, city, state, zipcode)
+                    if realtor_data:
+                        # Extract property_id for URL generation
+                        realtor_property_id = realtor_data.get('property_id')
+                        # Extract description
+                        realtor_desc = self.realtor_api.get_property_description(address, city, state, zipcode)
+                        if realtor_desc:
+                            description_text = realtor_desc
+                            source_found = "Realtor.com"
+                            print(f"   ✅ Description found on Realtor.com (ID: {realtor_property_id})")
+
+                # ATTEMPT 3: Try Redfin API if still no description
+                if not description_text:
+                    print(f"   🔄 Trying Redfin...")
+                    redfin_desc = self.redfin_api.get_property_description(address, city, state, zipcode)
+                    if redfin_desc:
+                        description_text = redfin_desc
+                        source_found = "Redfin"
+                        print(f"   ✅ Description found on Redfin")
+
+                # ATTEMPT 4: Try AI Web Scraper as last resort
+                if not description_text:
+                    print(f"   🔄 APIs failed, trying AI web scraper...")
+                    # Construct property URLs for scraping
+                    zpid = prop.get('zpid', '')
+                    zillow_url = f"https://www.zillow.com/homedetails/{zpid}_zpid/" if zpid else None
+                    realtor_url = f"https://www.realtor.com/realestateandhomes-detail/{realtor_property_id}" if realtor_property_id else None
+
+                    scraper_desc = self.ai_scraper.get_property_description(
+                        zillow_url=zillow_url,
+                        realtor_url=realtor_url
+                    )
+                    if scraper_desc:
+                        description_text = scraper_desc
+                        source_found = "AI Web Scraper"
+                        print(f"   ✅ Description extracted via AI scraper")
+
+            print(f"   📝 Description: {'Yes (' + str(len(description_text)) + ' chars from ' + source_found + ')' if description_text else 'No description found from any source'}")
+            if description_text:
+                # Show first 150 chars of description for debugging
+                preview = description_text[:150].replace('\n', ' ').strip()
+                print(f"   📄 Preview: {preview}...")
+
+            # Detect fixer keywords
+            keyword_analysis = self.detect_fixer_keywords(description_text)
+
+            if keyword_analysis.get('is_fixer'):
+                print(f"   🔧 FIXER DETECTED! Keywords: {', '.join(keyword_analysis.get('keywords_found', []))}")
+            else:
+                print(f"   ℹ️  No fixer keywords found")
+
+            # Score deal (use medium as baseline)
             deal_score = self.calculate_deal_score(list_price, arv_conservative, rehab['property_age'])
             
-            # Build response
+            # Build response with all scenarios
             result = {
                 "success": True,
                 "property": {
@@ -219,26 +490,62 @@ class ZillowPropertyAnalyzer:
                     "sqft": sqft,
                     "year_built": year_built,
                     "property_age": rehab['property_age'],
-                    "list_price": list_price
+                    "list_price": list_price,
+                    "rent_zestimate": rent_zestimate
+                },
+                "api_source": {
+                    "description_source": source_found,
+                    "realtor_property_id": realtor_property_id
                 },
                 "valuation": {
                     "zestimate": zestimate,
                     "arv_conservative": round(arv_conservative, 0),
                     "arv_source": "Zillow Zestimate × 0.95"
                 },
-                "rehab": {
-                    "recommended": round(rehab['recommended'], 0),
-                    "scope": rehab['scope'],
-                    "description": rehab['description'],
-                    "per_sqft": round(rehab['recommended'] / sqft, 2) if sqft > 0 else 0
+                "rehab_scenarios": {
+                    "light": {
+                        "cost": round(rehab['light'], 0),
+                        "per_sqft": rehab['light_per_sqft'],
+                        "description": "Cosmetic: paint, flooring, fixtures"
+                    },
+                    "medium": {
+                        "cost": round(rehab['medium'], 0),
+                        "per_sqft": rehab['medium_per_sqft'],
+                        "description": "Kitchen, baths, HVAC, roof"
+                    },
+                    "heavy": {
+                        "cost": round(rehab['heavy'], 0),
+                        "per_sqft": rehab['heavy_per_sqft'],
+                        "description": "Full renovation, foundation, systems"
+                    },
+                    "suggested": rehab['suggested_scope']
                 },
                 "investor_analysis": {
-                    "mao_70_percent": round(mao_70, 0),
-                    "mao_65_percent": round(mao_65, 0),
-                    "mao_75_percent": round(mao_75, 0),
-                    "recommended_max_offer": round(mao_70, 0),
-                    "profit_potential": round(profit_at_mao, 0),
-                    "roi_percentage": round(roi, 1)
+                    # MAO for each rehab scenario
+                    "mao_light_rehab": round(mao_light, 0),
+                    "mao_medium_rehab": round(mao_medium, 0),
+                    "mao_heavy_rehab": round(mao_heavy, 0),
+                    # Profit for each scenario
+                    "profit_light": round(profit_light, 0),
+                    "profit_medium": round(profit_medium, 0),
+                    "profit_heavy": round(profit_heavy, 0),
+                    # Best scenario
+                    "best_scenario": best_scenario,
+                    "best_profit": round(best_profit, 0),
+                    # Legacy fields (using medium as default)
+                    "mao_70_percent": round(mao_medium, 0),
+                    "profit_potential": round(profit_medium, 0),
+                    "roi_percentage": round((profit_medium / list_price * 100), 1) if list_price > 0 else 0
+                },
+                "keywords": {
+                    "is_fixer": keyword_analysis['is_fixer'],
+                    "keywords_found": keyword_analysis['keywords_found'],
+                    "keyword_count": keyword_analysis['keyword_count']
+                },
+                "description": {
+                    "text": description_text if description_text else "",
+                    "source": source_found,
+                    "length": len(description_text) if description_text else 0
                 },
                 "deal_quality": deal_score,
                 "analysis_date": datetime.now().isoformat()

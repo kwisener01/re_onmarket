@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FYNIX Deal Finder - Real Estate Investment Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-top: 3px solid #667eea;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .results h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .summary-card .label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .property-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .property-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .property-address {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .deal-score {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .property-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .detail-item {
+            font-size: 0.9rem;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: #333;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .sheet-link {
+            background: #34a853;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .sheet-link:hover {
+            background: #2d8e47;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .helper-text {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 FYNIX Deal Finder</h1>
+            <p>Find Investment Properties with AI-Powered Analysis</p>
+        </div>
+
+        <div class="form-container">
+            <form id="searchForm">
+                <div class="form-group">
+                    <label for="location">Location *</label>
+                    <input type="text" id="location" name="location" placeholder="e.g., Mableton, GA or 30126" required>
+                    <div class="helper-text">Enter city, state, or ZIP code</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="min_price">Min Price ($)</label>
+                        <input type="number" id="min_price" name="min_price" placeholder="50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="max_price">Max Price ($)</label>
+                        <input type="number" id="max_price" name="max_price" placeholder="200000">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="beds_min">Min Bedrooms</label>
+                        <input type="number" id="beds_min" name="beds_min" placeholder="3" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="baths_min">Min Bathrooms</label>
+                        <input type="number" id="baths_min" name="baths_min" placeholder="2" min="0" step="0.5">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="screen_count">Properties to Screen</label>
+                        <input type="number" id="screen_count" name="screen_count" value="40" min="1" max="100">
+                        <div class="helper-text">How many properties to initially review (API returns max 40)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="analyze_count">Properties to Analyze</label>
+                        <input type="number" id="analyze_count" name="analyze_count" value="20" min="1" max="50">
+                        <div class="helper-text">How many to deeply analyze (more = more API calls)</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="min_score">Minimum Deal Score (1-10)</label>
+                    <input type="number" id="min_score" name="min_score" value="6" min="1" max="10">
+                    <div class="helper-text">Only analyze price trends for deals scoring this or higher</div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="save_to_sheets" name="save_to_sheets" checked>
+                        <label for="save_to_sheets">Save results to Google Sheets</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="fixer_only" name="fixer_only">
+                        <label for="fixer_only">🔧 Only show fixer-upper properties (keywords in description)</label>
+                    </div>
+                    <div class="helper-text">Filter for properties with keywords like "fixer", "handyman special", "TLC", "as-is", etc.</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description_source">Property Description Source</label>
+                    <select id="description_source" name="description_source">
+                        <option value="auto">Auto (Try All - Recommended)</option>
+                        <option value="zillow">Zillow Only</option>
+                        <option value="realtor">Realtor.com (Preferred)</option>
+                        <option value="redfin">Redfin (Free Fallback)</option>
+                    </select>
+                    <div class="helper-text">Choose which API to use for property descriptions. "Auto" tries Zillow → Realtor → Redfin → AI Web Scraper.</div>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">
+                    🔍 Find Investment Deals
+                </button>
+            </form>
+
+            <div class="error" id="errorDiv"></div>
+
+            <div class="loading" id="loadingDiv">
+                <div class="spinner"></div>
+                <p>Analyzing properties... This may take a minute.</p>
+            </div>
+        </div>
+
+        <div class="results" id="resultsDiv">
+            <h2>📊 Search Results</h2>
+
+            <div class="summary" id="summaryDiv"></div>
+
+            <div id="sheetLinkDiv"></div>
+
+            <h3 style="margin: 30px 0 15px 0;">Top Deals</h3>
+            <div id="propertiesDiv"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('searchForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingDiv = document.getElementById('loadingDiv');
+        const resultsDiv = document.getElementById('resultsDiv');
+        const errorDiv = document.getElementById('errorDiv');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Reset UI
+            loadingDiv.classList.add('active');
+            resultsDiv.classList.remove('active');
+            errorDiv.classList.remove('active');
+            submitBtn.disabled = true;
+
+            // Get form data
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Search failed');
+                }
+
+                displayResults(data);
+
+            } catch (error) {
+                errorDiv.textContent = `Error: ${error.message}`;
+                errorDiv.classList.add('active');
+            } finally {
+                loadingDiv.classList.remove('active');
+                submitBtn.disabled = false;
+            }
+        });
+
+        function displayResults(data) {
+            const results = data.results;
+
+            // Summary
+            const summaryHTML = `
+                <div class="summary-card">
+                    <div class="number">${results.properties_found}</div>
+                    <div class="label">Found</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${results.properties_screened}</div>
+                    <div class="label">Screened</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${results.properties_analyzed}</div>
+                    <div class="label">Analyzed</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${results.hot_deals.length}</div>
+                    <div class="label">Hot Deals</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${results.api_calls}</div>
+                    <div class="label">API Calls</div>
+                </div>
+            `;
+            document.getElementById('summaryDiv').innerHTML = summaryHTML;
+
+            // Google Sheets link
+            if (data.sheet_info && data.sheet_info.success) {
+                let sheetHTML = `
+                    <a href="${data.sheet_info.url}" target="_blank" class="sheet-link">
+                        📊 View Results in Google Sheets
+                    </a>
+                `;
+
+                // Show duplicate info if any were skipped
+                if (data.sheet_info.rows_skipped > 0) {
+                    sheetHTML += `
+                        <div style="margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <strong>ℹ️ Duplicate Detection:</strong><br>
+                            ${data.sheet_info.message}
+                        </div>
+                    `;
+                }
+
+                document.getElementById('sheetLinkDiv').innerHTML = sheetHTML;
+            }
+
+            // Properties
+            const propertiesHTML = results.all_results.slice(0, 10).map((prop, i) => {
+                const analysis = prop.detailed_analysis;
+                if (!analysis || !analysis.success) return '';
+
+                const property = analysis.property;
+                const investor = analysis.investor_analysis;
+                const deal = analysis.deal_quality;
+
+                return `
+                    <div class="property-card">
+                        <div class="property-header">
+                            <div>
+                                <div class="property-address">#${i + 1} ${prop.full_address}</div>
+                                <div style="margin-top: 5px; color: #666;">${deal.recommendation}</div>
+                            </div>
+                            <div class="deal-score">Score: ${deal.score}/10</div>
+                        </div>
+                        <div class="property-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Price:</span>
+                                <span class="detail-value">$${prop.price.toLocaleString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Beds/Baths:</span>
+                                <span class="detail-value">${property.beds}/${property.baths}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Sqft:</span>
+                                <span class="detail-value">${property.sqft.toLocaleString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">ARV:</span>
+                                <span class="detail-value">$${analysis.valuation.zestimate.toLocaleString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">MAO (70%):</span>
+                                <span class="detail-value">$${investor.mao_70_percent.toLocaleString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Profit:</span>
+                                <span class="detail-value">$${investor.profit_potential.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('propertiesDiv').innerHTML = propertiesHTML;
+
+            // Show results
+            resultsDiv.classList.add('active');
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

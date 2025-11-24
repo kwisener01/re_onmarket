@@ -37,11 +37,13 @@ class DealFinder:
         max_price: int = None,
         beds_min: int = None,
         baths_min: int = None,
-        initial_screen: int = 20,
-        deep_analyze: int = 5,
+        initial_screen: int = 40,
+        deep_analyze: int = 20,
         min_deal_score: int = 6,
         check_price_history: bool = True,
         check_rental: bool = True,
+        fixer_only: bool = False,
+        description_source: str = 'auto',
         save_file: str = None
     ) -> Dict:
         """
@@ -53,11 +55,13 @@ class DealFinder:
             max_price: Maximum price
             beds_min: Minimum bedrooms
             baths_min: Minimum bathrooms
-            initial_screen: Number of properties to quick-screen (default: 20)
-            deep_analyze: Number of top properties to deep-analyze (default: 5)
+            initial_screen: Number of properties to quick-screen (default: 40)
+            deep_analyze: Number of top properties to deep-analyze (default: 20)
             min_deal_score: Minimum deal score to consider (default: 6)
             check_price_history: Check price trends for top deals (default: True)
             check_rental: Analyze rental potential for top deals (default: True)
+            fixer_only: Only include properties with fixer keywords (default: False)
+            description_source: API preference for descriptions: 'auto', 'zillow', 'realtor', 'redfin' (default: 'auto')
             save_file: Save results to JSON file
 
         Returns:
@@ -82,6 +86,8 @@ class DealFinder:
 
         print("\n" + "="*80)
         print("🔍 FYNIX DEAL FINDER - Optimized Workflow")
+        if fixer_only:
+            print("🔧 FILTER: Fixer-Upper Properties Only")
         print("="*80 + "\n")
 
         # STEP 1: Search for properties (1 API call)
@@ -167,17 +173,32 @@ class DealFinder:
             print(f"   List Price: ${prop['price']:,}")
 
             # Analyze property (1 API call)
+            # Pass search data as fallback in case API doesn't return all fields
             analysis = self.analyzer.analyze_property(
                 address=prop['address'],
                 city=prop['city'],
                 state=prop['state'],
-                zipcode=prop['zipcode']
+                zipcode=prop['zipcode'],
+                search_data=prop,  # Pass search data with known values
+                description_source=description_source  # Pass user's API preference
             )
             results['api_calls'] += 1
 
             if not analysis.get('success'):
                 print(f"   ❌ Failed to analyze")
                 continue
+
+            # Check fixer filter if enabled
+            if fixer_only:
+                keywords_data = analysis.get('keywords', {})
+                is_fixer = keywords_data.get('is_fixer', False)
+
+                if not is_fixer:
+                    print(f"   ⏭️  Skipping - Not a fixer-upper")
+                    continue
+                else:
+                    keywords_found = keywords_data.get('keywords_found', [])
+                    print(f"   🔧 Fixer keywords: {', '.join(keywords_found)}")
 
             deal_score = analysis['deal_quality']['score']
             recommendation = analysis['deal_quality']['recommendation']
@@ -328,8 +349,8 @@ Workflow:
     parser.add_argument('--beds', type=int, help='Minimum bedrooms')
     parser.add_argument('--baths', type=int, help='Minimum bathrooms')
 
-    parser.add_argument('--screen', type=int, default=20, help='Number of properties to quick-screen (default: 20)')
-    parser.add_argument('--analyze', type=int, default=5, help='Number of properties to analyze in detail (default: 5)')
+    parser.add_argument('--screen', type=int, default=40, help='Number of properties to quick-screen (default: 40)')
+    parser.add_argument('--analyze', type=int, default=20, help='Number of properties to analyze in detail (default: 20)')
     parser.add_argument('--min-score', type=int, default=6, help='Minimum deal score for deep analysis (default: 6)')
 
     parser.add_argument('--no-history', action='store_true', help='Skip price history analysis')

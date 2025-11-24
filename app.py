@@ -215,8 +215,8 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 deal.get('score', 0),
                 deal.get('label', ''),
                 deal.get('recommendation', ''),
-                # Rental analysis
-                rental.get('income', {}).get('monthly_rent', 0) if rental else 0,
+                # Rental analysis (use rent estimate if available, even without full analysis)
+                rental.get('income', {}).get('monthly_rent', 0) if rental else property_data.get('rent_zestimate', 0),
                 rental.get('cash_flow', {}).get('monthly_cash_flow', 0) if rental else 0,
                 rental.get('roi_metrics', {}).get('cash_on_cash_return', 0) if rental else 0,
                 rental.get('roi_metrics', {}).get('cap_rate', 0) if rental else 0,

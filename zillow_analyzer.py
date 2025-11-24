@@ -298,6 +298,10 @@ class ZillowPropertyAnalyzer:
             # Zestimate extraction
             zestimate = extract_field(prop, 'zestimate', 'homeValue', 'estimate', 'estimatedValue', 'valuation', default=list_price)
 
+            # Rent Zestimate extraction (for rental analysis)
+            rent_zestimate = extract_field(prop, 'rentZestimate', 'rent_zestimate', 'rentalZestimate', 'rental_zestimate',
+                                         'monthlyRent', 'estimatedRent', 'rentEstimate', default=0)
+
             # Use search data as fallback if API didn't return values
             if search_data:
                 if beds in [0, 3]:  # 3 is default, use search data if available
@@ -316,6 +320,8 @@ class ZillowPropertyAnalyzer:
             print(f"🔍 Extracted values:")
             print(f"   Beds: {beds}, Baths: {baths}, Sqft: {sqft}")
             print(f"   Year: {year_built}, Price: ${list_price:,}, Zestimate: ${zestimate:,}")
+            if rent_zestimate > 0:
+                print(f"   Rent Estimate: ${rent_zestimate:,}/month")
             print()
             
             # Conservative ARV (95% of Zestimate)
@@ -484,7 +490,8 @@ class ZillowPropertyAnalyzer:
                     "sqft": sqft,
                     "year_built": year_built,
                     "property_age": rehab['property_age'],
-                    "list_price": list_price
+                    "list_price": list_price,
+                    "rent_zestimate": rent_zestimate
                 },
                 "api_source": {
                     "description_source": source_found,

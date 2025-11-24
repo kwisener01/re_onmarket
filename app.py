@@ -116,7 +116,7 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             'Deal Score', 'Deal Grade', 'Recommendation',
             'Monthly Rent', 'Cash Flow', 'Cash-on-Cash %', 'Cap Rate %',
             'Price Trend', '1-Year Change %',
-            'ARV*.75-List'
+            'ARV*.75-List', 'Rent Estimate'
         ]
 
         # Prepare rows to append
@@ -224,7 +224,9 @@ def save_to_google_sheets(results, spreadsheet_id=None):
                 price_hist.get('trend', '') if price_hist else '',
                 price_hist.get('one_year_change_pct', 0) if price_hist else 0,
                 # Quick flip spread (ARV * 0.75 - List Price)
-                round((valuation.get('zestimate', 0) * 0.75) - prop.get('price', 0), 0)
+                round((valuation.get('zestimate', 0) * 0.75) - prop.get('price', 0), 0),
+                # Rent estimate from Zillow (for buy-and-hold analysis)
+                property_data.get('rent_zestimate', 0)
             ]
 
             rows.append(row)
@@ -238,8 +240,8 @@ def save_to_google_sheets(results, spreadsheet_id=None):
             else:
                 # Write headers + data rows
                 worksheet.update('A1', rows)
-                # Format header row (now with more columns for all scenarios + ARV*.75-List)
-                worksheet.format('A1:AH1', {
+                # Format header row (now with more columns for all scenarios + ARV*.75-List + Rent Estimate)
+                worksheet.format('A1:AI1', {
                     'textFormat': {'bold': True},
                     'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9}
                 })
